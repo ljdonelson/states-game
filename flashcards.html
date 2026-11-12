@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>States and Capitals Flashcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1d3557; --navy2:#264a78; --cream:#fdf6e9; --paper:#ffffff;
+    --sky:#a8dadc; --blue:#1f6fd1; --orange:#e86a10; --gold:#f4b400;
+    --ink:#1b2333; --muted:#5b6578; --line:#e3dccd;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Fredoka',system-ui,sans-serif; color:var(--ink);
+    background:var(--cream);
+    background-image:radial-gradient(circle at 12% 18%, #fbe3c2 0 90px, transparent 91px),
+                     radial-gradient(circle at 88% 82%, #d6ecee 0 120px, transparent 121px);
+    min-height:100vh;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+  header{text-align:center;margin-bottom:18px}
+  header h1{font-size:clamp(28px,6vw,44px);margin:6px 0 2px;color:var(--navy);letter-spacing:.5px}
+  header p{margin:0;color:var(--muted);font-size:17px}
+  .stars-row{font-size:22px;letter-spacing:6px}
+  .panel{background:var(--paper);border:3px solid var(--navy);border-radius:22px;padding:22px;box-shadow:0 6px 0 var(--navy)}
+  h2{margin:0 0 14px;color:var(--navy);font-size:22px}
+  .group{margin-bottom:18px}
+  .group-label{font-weight:600;margin-bottom:8px;font-size:17px}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{
+    font:inherit;font-size:17px;padding:10px 16px;border-radius:999px;cursor:pointer;
+    border:3px solid var(--navy);background:#fff;color:var(--navy);font-weight:500;
+  }
+  .chip[aria-pressed="true"]{background:var(--navy);color:#fff}
+  .chip[aria-pressed="true"]::before{content:"\2714  ";}
+  input[type=text]{font:inherit;font-size:18px;padding:10px 14px;border:3px solid var(--navy);border-radius:14px;width:100%;max-width:320px}
+  .btn{
+    font:inherit;font-size:20px;font-weight:600;padding:12px 26px;border-radius:16px;cursor:pointer;
+    border:3px solid var(--navy);background:var(--gold);color:var(--ink);box-shadow:0 4px 0 var(--navy);
+    transition:transform .08s, box-shadow .08s;
+  }
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--navy)}
+  .btn.secondary{background:#fff}
+  .btn.blue{background:var(--blue);color:#fff}
+  .btn.small{font-size:16px;padding:8px 14px}
+  .center{text-align:center}
+  .hidden{display:none !important}
+
+  /* top bar in game */
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .pill{background:#fff;border:3px solid var(--navy);border-radius:999px;padding:6px 14px;font-weight:600;font-size:16px}
+  .progress{height:16px;background:#fff;border:3px solid var(--navy);border-radius:999px;overflow:hidden;margin-bottom:18px}
+  .progress > div{height:100%;width:0;background:repeating-linear-gradient(45deg,var(--sky) 0 12px,#8cc8cb 12px 24px);transition:width .3s}
+
+  /* flip card */
+  .scene{perspective:1200px;margin:0 auto 18px;max-width:560px}
+  .card{position:relative;width:100%;height:300px;cursor:pointer;transform-style:preserve-3d;transition:transform .55s}
+  .card.flipped{transform:rotateY(180deg)}
+  .face{
+    position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    border:4px solid var(--navy);border-radius:26px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:20px;text-align:center;box-shadow:0 8px 0 var(--navy);
+  }
+  .front{background:#fff}
+  .back{background:var(--navy);color:#fff;transform:rotateY(180deg)}
+  .face .tag{font-size:15px;text-transform:uppercase;letter-spacing:2px;opacity:.75;margin-bottom:10px}
+  .face .big{font-size:clamp(34px,8vw,56px);font-weight:700;line-height:1.1}
+  .face .hint{font-size:15px;opacity:.7;margin-top:16px}
+  .region-badge{position:absolute;top:14px;right:16px;font-size:13px;border:2px solid currentColor;border-radius:999px;padding:3px 10px;opacity:.8}
+  .speak{position:absolute;top:10px;left:12px;background:transparent;border:none;font-size:26px;cursor:pointer;color:inherit}
+  .actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+
+  /* quiz */
+  .question{font-size:20px;text-align:center;margin-bottom:6px;color:var(--muted)}
+  .q-big{font-size:clamp(34px,8vw,54px);font-weight:700;text-align:center;color:var(--navy);margin-bottom:18px;line-height:1.1}
+  .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:520px){.choices{grid-template-columns:1fr}}
+  .choice{
+    font:inherit;font-size:21px;font-weight:600;padding:16px 12px;border-radius:18px;cursor:pointer;
+    border:3px solid var(--navy);background:#fff;color:var(--ink);box-shadow:0 4px 0 var(--navy);text-align:left;
+    display:flex;align-items:center;gap:10px;min-height:66px;
+  }
+  .choice .num{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--cream);border:2px solid var(--navy);font-size:16px;flex-shrink:0}
+  .choice .mark{margin-left:auto;font-size:26px}
+  .choice.right{background:var(--blue);color:#fff;border-style:solid}
+  .choice.wrong{background:#fff3e8;border-color:var(--orange);border-style:dashed;color:var(--ink);text-decoration:line-through}
+  .choice:disabled{cursor:default}
+  .feedback{min-height:64px;text-align:center;font-size:22px;font-weight:600;margin:16px 0 6px}
+  .feedback .ok{color:var(--blue)}
+  .feedback .no{color:var(--orange)}
+
+  /* results */
+  .result-big{font-size:clamp(40px,10vw,64px);font-weight:700;color:var(--navy);margin:6px 0}
+  .missed-list{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0 18px}
+  .missed-list span{background:var(--cream);border:2px solid var(--navy);border-radius:12px;padding:6px 10px;font-size:16px}
+  .best{color:var(--muted);margin-top:4px}
+  .keys{color:var(--muted);font-size:14px;text-align:center;margin-top:14px}
+
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+  .bump{animation:bump .35s}
+  @keyframes bump{50%{transform:scale(1.15)}}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div class="wrap">
+  <header>
+    <div class="stars-row" aria-hidden="true">&#9733; &#9733; &#9733;</div>
+    <h1>States and Capitals</h1>
+    <p>Learn all 50 states and their capital cities!</p>
+  </header>
+
+  <!-- SETUP -->
+  <section id="setup" class="panel">
+    <h2>Let's get ready to play</h2>
+    <div class="group">
+      <div class="group-label">Player name</div>
+      <input type="text" id="playerName" placeholder="Type your name" maxlength="20">
+    </div>
+    <div class="group">
+      <div class="group-label">How do you want to play?</div>
+      <div class="chips" data-key="mode">
+        <button class="chip" data-val="flip" aria-pressed="true">&#127183; Flip Cards</button>
+        <button class="chip" data-val="quiz" aria-pressed="false">&#127919; Quiz Game</button>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-label">What should the card show?</div>
+      <div class="chips" data-key="dir">
+        <button class="chip" data-val="s2c" aria-pressed="true">State, guess the Capital</button>
+        <button class="chip" data-val="c2s" aria-pressed="false">Capital, guess the State</button>
+        <button class="chip" data-val="mix" aria-pressed="false">Mix it up</button>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-label">Which states?</div>
+      <div class="chips" data-key="region">
+        <button class="chip" data-val="All" aria-pressed="true">All 50</button>
+        <button class="chip" data-val="Northeast" aria-pressed="false">Northeast (11)</button>
+        <button class="chip" data-val="Midwest" aria-pressed="false">Midwest (12)</button>
+        <button class="chip" data-val="South" aria-pressed="false">South (12)</button>
+        <button class="chip" data-val="Southwest" aria-pressed="false">Southwest (4)</button>
+        <button class="chip" data-val="West" aria-pressed="false">West (11)</button>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-label">How many cards?</div>
+      <div class="chips" data-key="count">
+        <button class="chip" data-val="10" aria-pressed="true">10</button>
+        <button class="chip" data-val="20" aria-pressed="false">20</button>
+        <button class="chip" data-val="all" aria-pressed="false">All of them</button>
+      </div>
+    </div>
+    <div class="center" style="margin-top:22px">
+      <button class="btn" id="startBtn">Start Playing &#9654;</button>
+    </div>
+    <p class="center" style="margin:12px 0 0;font-size:15px"><a href="index.html" style="color:var(--navy);font-weight:600">Play the Map version &#8594;</a></p>
+    <p class="best center" id="bestLine"></p>
+  </section>
+
+  <!-- FLIP MODE -->
+  <section id="flipView" class="hidden">
+    <div class="topbar">
+      <button class="btn secondary small" data-home>&#8962; Menu</button>
+      <span class="pill" id="flipCounter">Card 1 of 10</span>
+      <span class="pill" id="flipKnown">&#10004; Known: 0</span>
+    </div>
+    <div class="progress"><div id="flipBar"></div></div>
+    <div class="scene">
+      <div class="card" id="card" role="button" tabindex="0" aria-label="Flashcard, tap to flip">
+        <div class="face front">
+          <span class="region-badge" id="frontRegion"></span>
+          <button class="speak" id="speakFront" title="Say it out loud" aria-label="Say it out loud">&#128264;</button>
+          <div class="tag" id="frontTag">State</div>
+          <div class="big" id="frontText">Alabama</div>
+          <div class="hint">Tap the card to flip it over</div>
+        </div>
+        <div class="face back">
+          <span class="region-badge" id="backRegion"></span>
+          <button class="speak" id="speakBack" title="Say it out loud" aria-label="Say it out loud">&#128264;</button>
+          <div class="tag" id="backTag">Capital</div>
+          <div class="big" id="backText">Montgomery</div>
+          <div class="hint" id="backSub"></div>
+        </div>
+      </div>
+    </div>
+    <div class="actions" id="flipActions">
+      <button class="btn secondary" id="againBtn">&#8635; Practice Again</button>
+      <button class="btn blue" id="knewBtn">&#10004; I Knew It!</button>
+    </div>
+    <p class="keys">Keyboard: Space flips the card &bull; Right arrow = I Knew It &bull; Left arrow = Practice Again</p>
+  </section>
+
+  <!-- QUIZ MODE -->
+  <section id="quizView" class="hidden">
+    <div class="topbar">
+      <button class="btn secondary small" data-home>&#8962; Menu</button>
+      <span class="pill" id="quizCounter">Question 1 of 10</span>
+      <span class="pill" id="quizScore">&#11088; Score: 0</span>
+      <span class="pill" id="quizStreak">&#128293; Streak: 0</span>
+    </div>
+    <div class="progress"><div id="quizBar"></div></div>
+    <div class="panel">
+      <div class="question" id="qPrompt">What is the capital of</div>
+      <div class="q-big" id="qText">Alabama</div>
+      <div class="choices" id="choices"></div>
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <div class="center"><button class="btn hidden" id="nextBtn">Next &#9654;</button></div>
+    </div>
+    <p class="keys">Keyboard: press 1, 2, 3, or 4 to pick an answer &bull; Enter for Next</p>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="resultView" class="panel center hidden">
+    <div class="stars-row" id="resultStars" style="font-size:40px"></div>
+    <h2 id="resultTitle" style="font-size:28px">Great job!</h2>
+    <div class="result-big" id="resultScore">10 / 10</div>
+    <p id="resultMsg" style="font-size:18px"></p>
+    <div id="missedWrap">
+      <div class="group-label">Let's practice these:</div>
+      <div class="missed-list" id="missedList"></div>
+    </div>
+    <div class="actions">
+      <button class="btn blue" id="practiceMissedBtn">&#8635; Practice the Ones I Missed</button>
+      <button class="btn" id="playAgainBtn">Play Again</button>
+      <button class="btn secondary" data-home>&#8962; Menu</button>
+    </div>
+    <p class="best" id="resultBest"></p>
+  </section>
+</div>
+
+<script>
+const STATES = [
+  ["Alabama","Montgomery","South"],["Alaska","Juneau","West"],["Arizona","Phoenix","Southwest"],
+  ["Arkansas","Little Rock","South"],["California","Sacramento","West"],["Colorado","Denver","West"],
+  ["Connecticut","Hartford","Northeast"],["Delaware","Dover","Northeast"],["Florida","Tallahassee","South"],
+  ["Georgia","Atlanta","South"],["Hawaii","Honolulu","West"],["Idaho","Boise","West"],
+  ["Illinois","Springfield","Midwest"],["Indiana","Indianapolis","Midwest"],["Iowa","Des Moines","Midwest"],
+  ["Kansas","Topeka","Midwest"],["Kentucky","Frankfort","South"],["Louisiana","Baton Rouge","South"],
+  ["Maine","Augusta","Northeast"],["Maryland","Annapolis","Northeast"],["Massachusetts","Boston","Northeast"],
+  ["Michigan","Lansing","Midwest"],["Minnesota","Saint Paul","Midwest"],["Mississippi","Jackson","South"],
+  ["Missouri","Jefferson City","Midwest"],["Montana","Helena","West"],["Nebraska","Lincoln","Midwest"],
+  ["Nevada","Carson City","West"],["New Hampshire","Concord","Northeast"],["New Jersey","Trenton","Northeast"],
+  ["New Mexico","Santa Fe","Southwest"],["New York","Albany","Northeast"],["North Carolina","Raleigh","South"],
+  ["North Dakota","Bismarck","Midwest"],["Ohio","Columbus","Midwest"],["Oklahoma","Oklahoma City","Southwest"],
+  ["Oregon","Salem","West"],["Pennsylvania","Harrisburg","Northeast"],["Rhode Island","Providence","Northeast"],
+  ["South Carolina","Columbia","South"],["South Dakota","Pierre","Midwest"],["Tennessee","Nashville","South"],
+  ["Texas","Austin","Southwest"],["Utah","Salt Lake City","West"],["Vermont","Montpelier","Northeast"],
+  ["Virginia","Richmond","South"],["Washington","Olympia","West"],["West Virginia","Charleston","South"],
+  ["Wisconsin","Madison","Midwest"],["Wyoming","Cheyenne","West"]
+].map(([state,capital,region])=>({state,capital,region}));
+
+const NEAR={"Alabama":{"n":["Florida","Georgia","Mississippi","Tennessee"],"f":[]},"Alaska":{"n":[],"f":["Washington","Oregon","Montana","Idaho","Nevada"]},"Arizona":{"n":["California","Nevada","New Mexico","Utah"],"f":[]},"Arkansas":{"n":["Louisiana","Mississippi","Missouri","Oklahoma","Tennessee","Texas"],"f":[]},"California":{"n":["Arizona","Nevada","Oregon"],"f":[]},"Colorado":{"n":["Kansas","Nebraska","New Mexico","Oklahoma","Utah","Wyoming"],"f":[]},"Connecticut":{"n":["Massachusetts","New York","Rhode Island"],"f":[]},"Delaware":{"n":["Maryland","New Jersey","Pennsylvania"],"f":[]},"Florida":{"n":["Alabama","Georgia"],"f":["Mississippi","Tennessee","North Carolina","South Carolina"]},"Georgia":{"n":["Alabama","Florida","North Carolina","South Carolina","Tennessee"],"f":[]},"Hawaii":{"n":[],"f":["California","Nevada","Oregon","Washington","Alaska"]},"Idaho":{"n":["Montana","Nevada","Oregon","Utah","Washington","Wyoming"],"f":[]},"Illinois":{"n":["Indiana","Iowa","Kentucky","Missouri","Wisconsin"],"f":[]},"Indiana":{"n":["Illinois","Kentucky","Michigan","Ohio"],"f":[]},"Iowa":{"n":["Illinois","Minnesota","Missouri","Nebraska","South Dakota","Wisconsin"],"f":[]},"Kansas":{"n":["Colorado","Missouri","Nebraska","Oklahoma"],"f":[]},"Kentucky":{"n":["Illinois","Indiana","Missouri","Ohio","Tennessee","Virginia","West Virginia"],"f":[]},"Louisiana":{"n":["Arkansas","Mississippi","Texas"],"f":[]},"Maine":{"n":["New Hampshire"],"f":["Massachusetts","Vermont"]},"Maryland":{"n":["Delaware","Pennsylvania","Virginia","West Virginia"],"f":[]},"Massachusetts":{"n":["Connecticut","New Hampshire","New York","Rhode Island","Vermont"],"f":[]},"Michigan":{"n":["Indiana","Ohio","Wisconsin"],"f":[]},"Minnesota":{"n":["Iowa","North Dakota","South Dakota","Wisconsin"],"f":[]},"Mississippi":{"n":["Alabama","Arkansas","Louisiana","Tennessee"],"f":[]},"Missouri":{"n":["Arkansas","Illinois","Iowa","Kansas","Kentucky","Nebraska","Oklahoma","Tennessee"],"f":[]},"Montana":{"n":["Idaho","North Dakota","South Dakota","Wyoming"],"f":[]},"Nebraska":{"n":["Colorado","Iowa","Kansas","Missouri","South Dakota","Wyoming"],"f":[]},"Nevada":{"n":["Arizona","California","Idaho","Oregon","Utah"],"f":[]},"New Hampshire":{"n":["Maine","Massachusetts","Vermont"],"f":[]},"New Jersey":{"n":["Delaware","New York","Pennsylvania"],"f":[]},"New Mexico":{"n":["Arizona","Colorado","Oklahoma","Texas"],"f":[]},"New York":{"n":["Connecticut","Massachusetts","New Jersey","Pennsylvania","Vermont"],"f":[]},"North Carolina":{"n":["Georgia","South Carolina","Tennessee","Virginia"],"f":[]},"North Dakota":{"n":["Minnesota","Montana","South Dakota"],"f":[]},"Ohio":{"n":["Indiana","Kentucky","Michigan","Pennsylvania","West Virginia"],"f":[]},"Oklahoma":{"n":["Arkansas","Colorado","Kansas","Missouri","New Mexico","Texas"],"f":[]},"Oregon":{"n":["California","Idaho","Nevada","Washington"],"f":[]},"Pennsylvania":{"n":["Delaware","Maryland","New Jersey","New York","Ohio","West Virginia"],"f":[]},"Rhode Island":{"n":["Connecticut","Massachusetts"],"f":["New York","New Hampshire","Vermont"]},"South Carolina":{"n":["Georgia","North Carolina"],"f":["Alabama","Florida","Tennessee","Virginia"]},"South Dakota":{"n":["Iowa","Minnesota","Montana","Nebraska","North Dakota","Wyoming"],"f":[]},"Tennessee":{"n":["Alabama","Arkansas","Georgia","Kentucky","Mississippi","Missouri","North Carolina","Virginia"],"f":[]},"Texas":{"n":["Arkansas","Louisiana","New Mexico","Oklahoma"],"f":[]},"Utah":{"n":["Arizona","Colorado","Idaho","Nevada","Wyoming"],"f":[]},"Vermont":{"n":["Massachusetts","New Hampshire","New York"],"f":[]},"Virginia":{"n":["Kentucky","Maryland","North Carolina","Tennessee","West Virginia"],"f":[]},"Washington":{"n":["Idaho","Oregon"],"f":["Montana","Nevada","Utah","Wyoming","California"]},"West Virginia":{"n":["Kentucky","Maryland","Ohio","Pennsylvania","Virginia"],"f":[]},"Wisconsin":{"n":["Illinois","Iowa","Michigan","Minnesota"],"f":[]},"Wyoming":{"n":["Colorado","Idaho","Montana","Nebraska","South Dakota","Utah"],"f":[]}};
+const CITIES={"Alabama":["Birmingham","Huntsville","Mobile"],"Alaska":["Anchorage","Fairbanks"],"Arizona":["Tucson","Flagstaff","Mesa"],"Arkansas":["Fort Smith","Fayetteville","Hot Springs"],"California":["Los Angeles","San Francisco","San Diego"],"Colorado":["Colorado Springs","Boulder","Aurora"],"Connecticut":["Bridgeport","New Haven","Stamford"],"Delaware":["Wilmington","Newark"],"Florida":["Miami","Orlando","Jacksonville"],"Georgia":["Savannah","Macon","Athens"],"Hawaii":["Hilo","Kailua"],"Idaho":["Idaho Falls","Pocatello"],"Illinois":["Chicago","Peoria","Rockford"],"Indiana":["Fort Wayne","Evansville","South Bend"],"Iowa":["Cedar Rapids","Davenport","Iowa City"],"Kansas":["Wichita","Dodge City"],"Kentucky":["Louisville","Lexington","Bowling Green"],"Louisiana":["New Orleans","Shreveport","Lafayette"],"Maine":["Portland","Bangor"],"Maryland":["Baltimore","Ocean City","Frederick"],"Massachusetts":["Worcester","Plymouth","Cambridge"],"Michigan":["Detroit","Grand Rapids","Ann Arbor"],"Minnesota":["Minneapolis","Duluth","Rochester"],"Mississippi":["Biloxi","Tupelo","Gulfport"],"Missouri":["St. Louis","Kansas City","Branson"],"Montana":["Billings","Missoula","Bozeman"],"Nebraska":["Omaha","Grand Island"],"Nevada":["Las Vegas","Reno"],"New Hampshire":["Manchester","Nashua","Portsmouth"],"New Jersey":["Newark","Atlantic City","Jersey City"],"New Mexico":["Albuquerque","Las Cruces","Roswell"],"New York":["New York City","Buffalo","Rochester"],"North Carolina":["Charlotte","Asheville","Greensboro"],"North Dakota":["Fargo","Grand Forks","Minot"],"Ohio":["Cleveland","Cincinnati","Dayton"],"Oklahoma":["Tulsa","Norman"],"Oregon":["Portland","Eugene","Bend"],"Pennsylvania":["Philadelphia","Pittsburgh","Erie"],"Rhode Island":["Newport","Warwick"],"South Carolina":["Myrtle Beach","Greenville"],"South Dakota":["Sioux Falls","Rapid City"],"Tennessee":["Memphis","Knoxville","Chattanooga"],"Texas":["Houston","Dallas","San Antonio"],"Utah":["Provo","Ogden","Park City"],"Vermont":["Burlington","Rutland"],"Virginia":["Virginia Beach","Norfolk","Alexandria"],"Washington":["Seattle","Spokane","Tacoma"],"West Virginia":["Huntington","Morgantown","Wheeling"],"Wisconsin":["Milwaukee","Green Bay"],"Wyoming":["Casper","Laramie","Cody"]};
+const $ = id => document.getElementById(id);
+const settings = {mode:"flip", dir:"s2c", region:"All", count:"10"};
+let deck=[], idx=0, known=0, score=0, streak=0, bestStreak=0, missed=[], total=0, answered=false, lastDeckSource=null;
+
+/* ---------- storage (optional) ---------- */
+function loadBest(){ try{ return JSON.parse(localStorage.getItem("sc_best")||"{}"); }catch(e){ return {}; } }
+function saveBest(b){ try{ localStorage.setItem("sc_best", JSON.stringify(b)); }catch(e){} }
+function loadName(){ try{ return localStorage.getItem("sc_name")||""; }catch(e){ return ""; } }
+function saveName(n){ try{ localStorage.setItem("sc_name", n); }catch(e){} }
+
+/* ---------- setup chips ---------- */
+document.querySelectorAll(".chips").forEach(group=>{
+  group.addEventListener("click", e=>{
+    const b = e.target.closest(".chip"); if(!b) return;
+    group.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+    b.setAttribute("aria-pressed","true");
+    settings[group.dataset.key] = b.dataset.val;
+  });
+});
+$("playerName").value = loadName();
+function showBestLine(){
+  const b = loadBest();
+  $("bestLine").textContent = b.streak ? `Best quiz streak so far: ${b.streak} in a row!` : "";
+}
+showBestLine();
+
+function shuffle(a){ a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function show(view){ ["setup","flipView","quizView","resultView"].forEach(v=>$(v).classList.toggle("hidden", v!==view)); window.scrollTo(0,0); }
+function playerName(){ return ($("playerName").value||"").trim(); }
+
+function buildDeck(source){
+  let pool = source || STATES.filter(s=>settings.region==="All"||s.region===settings.region);
+  pool = shuffle(pool);
+  if(!source && settings.count!=="all") pool = pool.slice(0, Math.min(+settings.count, pool.length));
+  return pool.map(s=>({...s, dir: settings.dir==="mix" ? (Math.random()<.5?"s2c":"c2s") : settings.dir}));
+}
+
+function start(source){
+  saveName(playerName());
+  lastDeckSource = source || null;
+  deck = buildDeck(source); idx=0; known=0; score=0; streak=0; bestStreak=0; missed=[]; total=deck.length;
+  if(settings.mode==="flip"){ show("flipView"); renderFlip(); }
+  else { show("quizView"); renderQuiz(); }
+}
+$("startBtn").onclick = ()=>start();
+document.querySelectorAll("[data-home]").forEach(b=>b.onclick=()=>{ showBestLine(); show("setup"); });
+
+/* ---------- speech (optional) ---------- */
+const canSpeak = "speechSynthesis" in window;
+if(!canSpeak){ $("speakFront").classList.add("hidden"); $("speakBack").classList.add("hidden"); }
+function say(text){ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=.9; speechSynthesis.speak(u);}catch(e){} }
+
+/* ---------- FLIP MODE ---------- */
+const card = $("card");
+function renderFlip(){
+  const wasFlipped = card.classList.contains("flipped");
+  card.classList.remove("flipped");
+  const c = deck[idx];
+  const s2c = c.dir==="s2c";
+  setTimeout(()=>{
+    $("frontTag").textContent = s2c ? "State" : "Capital City";
+    $("frontText").textContent = s2c ? c.state : c.capital;
+    $("backTag").textContent = s2c ? "The capital is" : "It is the capital of";
+    $("backText").textContent = s2c ? c.capital : c.state;
+    $("backSub").textContent = s2c ? `${c.capital}, ${c.state}` : `${c.capital}, ${c.state}`;
+    $("frontRegion").textContent = c.region; $("backRegion").textContent = c.region;
+  }, wasFlipped ? 280 : 0);
+  $("flipCounter").textContent = `Card ${Math.min(idx+1,deck.length)} of ${deck.length}`;
+  $("flipKnown").textContent = `✔ Known: ${known}`;
+  $("flipBar").style.width = `${(known/total)*100}%`;
+}
+function flip(){ card.classList.toggle("flipped"); }
+card.addEventListener("click", e=>{ if(e.target.closest(".speak")) return; flip(); });
+$("speakFront").onclick = e=>{ e.stopPropagation(); say($("frontText").textContent); };
+$("speakBack").onclick = e=>{ e.stopPropagation(); say($("backText").textContent); };
+
+function knewIt(){
+  known++; idx++;
+  if(idx>=deck.length) return finish();
+  renderFlip();
+}
+function again(){
+  const c = deck[idx];
+  if(!missed.find(m=>m.state===c.state)) missed.push(c);
+  deck.push(deck.splice(idx,1)[0]);   // move to the back of the pile
+  renderFlip();
+}
+$("knewBtn").onclick = knewIt;
+$("againBtn").onclick = again;
+
+/* ---------- QUIZ MODE ---------- */
+function renderQuiz(){
+  answered=false;
+  const c = deck[idx];
+  const s2c = c.dir==="s2c";
+  $("qPrompt").textContent = s2c ? "What is the capital of" : "This city is the capital of which state?";
+  $("qText").textContent = s2c ? c.state : c.capital;
+  const right = s2c ? c.capital : c.state;
+  // distractors: prefer same region to make it a fair challenge
+  const field = s2c ? "capital" : "state";
+  const nb = NEAR[c.state], nearStates = [...shuffle(nb.n), ...shuffle(nb.f)].slice(0,3);
+  // capitals: two well-known cities from the same state plus a neighbor's capital; states: bordering states
+  const wrong = s2c ? [...shuffle(CITIES[c.state]).slice(0,2), STATES.find(x=>x.state===nearStates[0]).capital] : nearStates;
+  const opts = shuffle([right, ...wrong]);
+  const box = $("choices"); box.innerHTML="";
+  opts.forEach((o,i)=>{
+    const b=document.createElement("button");
+    b.className="choice"; b.dataset.val=o;
+    b.innerHTML=`<span class="num">${i+1}</span><span>${o}</span><span class="mark"></span>`;
+    b.onclick=()=>answer(b, right);
+    box.appendChild(b);
+  });
+  $("feedback").innerHTML=""; $("nextBtn").classList.add("hidden");
+  $("quizCounter").textContent=`Question ${idx+1} of ${deck.length}`;
+  $("quizScore").textContent=`⭐ Score: ${score}`;
+  $("quizStreak").textContent=`🔥 Streak: ${streak}`;
+  $("quizBar").style.width=`${(idx/deck.length)*100}%`;
+}
+const cheers = ["Awesome!","You got it!","Super smart!","Way to go!","Nailed it!","Fantastic!","Brilliant!"];
+function answer(btn, right){
+  if(answered) return; answered=true;
+  const c = deck[idx];
+  const ok = btn.dataset.val===right;
+  document.querySelectorAll(".choice").forEach(b=>{
+    b.disabled=true;
+    if(b.dataset.val===right){ b.classList.add("right"); b.querySelector(".mark").textContent="✔"; }
+  });
+  if(ok){
+    score++; streak++; bestStreak=Math.max(bestStreak,streak);
+    $("feedback").innerHTML=`<span class="ok">✔ ${cheers[Math.floor(Math.random()*cheers.length)]}</span>`;
+    $("quizScore").classList.remove("bump"); void $("quizScore").offsetWidth; $("quizScore").classList.add("bump");
+  } else {
+    streak=0;
+    btn.classList.add("wrong"); btn.querySelector(".mark").textContent="✖";
+    $("feedback").innerHTML=`<span class="no">✖ Not quite.</span> ${c.capital} is the capital of ${c.state}.`;
+    if(!missed.find(m=>m.state===c.state)) missed.push(c);
+  }
+  $("quizScore").textContent=`⭐ Score: ${score}`;
+  $("quizStreak").textContent=`🔥 Streak: ${streak}`;
+  $("nextBtn").classList.remove("hidden"); $("nextBtn").focus();
+}
+$("nextBtn").onclick = ()=>{ idx++; if(idx>=deck.length) finish(); else renderQuiz(); };
+
+/* ---------- RESULTS ---------- */
+function finish(){
+  const name = playerName();
+  let pct, line;
+  if(settings.mode==="flip"){
+    const firstTry = total - missed.length;
+    pct = firstTry/total;
+    $("resultScore").textContent = `${firstTry} / ${total}`;
+    line = `knew on the first try. You learned all ${total} cards!`;
+  } else {
+    pct = score/total;
+    $("resultScore").textContent = `${score} / ${total}`;
+    line = `correct. Best streak: ${bestStreak} in a row.`;
+    const b = loadBest();
+    if(bestStreak > (b.streak||0)){ b.streak=bestStreak; saveBest(b); line += " That is a new record!"; }
+  }
+  const stars = pct===1?3:pct>=.7?2:1;
+  $("resultStars").innerHTML = "★".repeat(stars) + "<span style='opacity:.25'>" + "★".repeat(3-stars) + "</span>";
+  const title = pct===1?"Perfect score":pct>=.7?"Great job":"Nice work, keep practicing";
+  $("resultTitle").textContent = name ? `${title}, ${name}!` : `${title}!`;
+  $("resultMsg").textContent = line;
+  $("missedWrap").classList.toggle("hidden", missed.length===0);
+  $("practiceMissedBtn").classList.toggle("hidden", missed.length===0);
+  $("missedList").innerHTML = missed.map(m=>`<span>${m.state}: <b>${m.capital}</b></span>`).join("");
+  const b = loadBest();
+  $("resultBest").textContent = b.streak ? `Best quiz streak ever: ${b.streak}` : "";
+  show("resultView");
+  if(pct>=.7) confetti();
+}
+$("practiceMissedBtn").onclick = ()=>start([...missed]);
+$("playAgainBtn").onclick = ()=>start(lastDeckSource);
+
+/* ---------- keyboard ---------- */
+document.addEventListener("keydown", e=>{
+  if(e.target.tagName==="INPUT") return;
+  if(!$("flipView").classList.contains("hidden")){
+    if(e.code==="Space"){ e.preventDefault(); flip(); }
+    else if(e.key==="ArrowRight") knewIt();
+    else if(e.key==="ArrowLeft") again();
+  } else if(!$("quizView").classList.contains("hidden")){
+    const n = parseInt(e.key,10);
+    const bs = document.querySelectorAll(".choice");
+    if(n>=1 && n<=bs.length && !answered) bs[n-1].click();
+    else if(e.key==="Enter" && answered){ e.preventDefault(); $("nextBtn").click(); }
+  }
+});
+
+/* ---------- confetti ---------- */
+function confetti(){
+  const cv=$("confetti"), ctx=cv.getContext("2d");
+  cv.width=innerWidth; cv.height=innerHeight;
+  const colors=["#1f6fd1","#f4b400","#e86a10","#a8dadc","#1d3557"];
+  const parts=Array.from({length:160},()=>({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,
+    r:5+Math.random()*6,vx:-2+Math.random()*4,vy:2+Math.random()*4,a:Math.random()*6,c:colors[Math.floor(Math.random()*colors.length)]}));
+  let t=0;
+  (function step(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.a+=.1;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.fillStyle=p.c;ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*1.6);ctx.restore();});
+    if(++t<200) requestAnimationFrame(step); else ctx.clearRect(0,0,cv.width,cv.height);
+  })();
+}
+</script>
+</body>
+</html>
