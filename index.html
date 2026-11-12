@@ -45,7 +45,9 @@
   .mapbox{background:#dff1f7;border:3px solid var(--navy);border-radius:22px;overflow:hidden;position:relative;box-shadow:0 6px 0 var(--navy);margin-bottom:14px}
   #map{display:block;width:100%;height:auto}
   .st{fill:var(--land);stroke:#7a8496;stroke-width:.8;vector-effect:non-scaling-stroke;transition:fill .3s}
-  #map.regional [data-state="Alaska"],#map.regional [data-state="Hawaii"]{display:none}
+  #map.regional:not(.westinsets) [data-state="Alaska"],#map.regional:not(.westinsets) [data-state="Hawaii"]{display:none}
+  #map:not(.westinsets) #westFrames{display:none}
+  .wframe{fill:#dff1f7;stroke:#7a8496;stroke-width:1;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
   .border{fill:none;stroke:#2b3a55;stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round;pointer-events:none}
   .other{fill:#ebe4d4;stroke:#9aa3b2;stroke-width:.6;vector-effect:non-scaling-stroke}
   .st.done{fill:#4f86c6}
@@ -201,6 +203,7 @@
       </defs>
       <g id="lyrNeighbors" class="ly ly-oceans"></g>
       <g id="lyrInsets" class="ly ly-oceans"></g>
+      <g id="westFrames"></g>
       <g id="others"></g>
       <g id="states"></g>
       <g id="lyrRanges" class="ly ly-mountains" clip-path="url(#landClip)"></g>
@@ -463,22 +466,22 @@ document.querySelectorAll("#lyrRiverHits path").forEach(h=>{
   });
 });
 const LAYER_KEYS=["water","mountains","oceans","compass","regions"];
-const LAYER_DEFAULTS={explore:{water:true,mountains:true,oceans:true,compass:true,regions:true},game:{water:false,mountains:false,oceans:false,compass:false,regions:false}};
-function layerCtx(){ return $("explore")&&!$("explore").classList.contains("hidden") ? "explore" : "game"; }
-function getLayers(ctx){ try{ const v=JSON.parse(localStorage.getItem("scm_layers_"+ctx)||"null"); if(v) return {...LAYER_DEFAULTS[ctx],...v}; }catch(e){} return {...LAYER_DEFAULTS[ctx]}; }
+// one shared set of layer choices for every game and the menu; all start off
+const LAYER_DEFAULTS={water:false,mountains:false,oceans:false,compass:false,regions:false};
+function layerCtx(){ return "all"; }
+function getLayers(){ try{ const v=JSON.parse(localStorage.getItem("scm_layers")||"null"); if(v) return {...LAYER_DEFAULTS,...v}; }catch(e){} return {...LAYER_DEFAULTS}; }
 function applyLayers(){
   const ctx=layerCtx(), st=getLayers(ctx);
   LAYER_KEYS.forEach(k=>{ if(k!=="compass") $("map").classList.toggle("show-"+k,!!st[k]); });
   $("compass").classList.toggle("hidden",!st.compass);
   $("mapbox").classList.toggle("has-compass",!!st.compass);
   document.querySelectorAll("#layerPanel input").forEach(cb=>cb.checked=!!st[cb.dataset.layer]);
-  $("layerPanel").title = ctx==="explore" ? "These settings apply to Explore." : "These settings apply to the quiz games. Layers can give helpful hints.";
-  $("lpNote").textContent = ctx==="explore" ? "These settings apply to Explore." : "These settings apply to the quiz games. Layers can give helpful hints.";
+  $("layerPanel").title = "These choices apply to every game and are remembered on this device.";
   updateScale();
 }
 document.querySelectorAll("#layerPanel input").forEach(cb=>cb.addEventListener("change",()=>{
   const ctx=layerCtx(), st=getLayers(ctx); st[cb.dataset.layer]=cb.checked;
-  try{ localStorage.setItem("scm_layers_"+ctx,JSON.stringify(st)); }catch(e){}
+  try{ localStorage.setItem("scm_layers",JSON.stringify(st)); }catch(e){}
   applyLayers();
 }));
 function updateScale(){
@@ -515,11 +518,47 @@ function boxFor(list,pad){
   return [x0,y0,w,h];
 }
 function regionStates(){ return STATES.filter(s=>settings.region==="All"||s.region===settings.region); }
+/* West region: Alaska and Hawaii are moved into boxes over the Pacific, left of the mainland */
+let INSET=null, insetKey=null;
+function computeInsets(){
+  if(settings.region===insetKey) return;
+  insetKey=settings.region; INSET=null;
+  if(settings.region==="West"){
+    const pad=18, list=STATES.filter(s=>s.region==="West"&&s.state!=="Alaska"&&s.state!=="Hawaii");
+    let mx0=1e9,my0=1e9,mx1=-1e9,my1=-1e9;
+    list.forEach(s=>{mx0=Math.min(mx0,s.b[0]);my0=Math.min(my0,s.b[1]);mx1=Math.max(mx1,s.b[2]);my1=Math.max(my1,s.b[3]);});
+    const h=(my1-my0)+2*pad, w=h*975/610, x1=mx1+pad, x0=x1-w, y0=my0-pad;
+    const sx0=x0+pad*.8, sx1=mx0-pad, sw=sx1-sx0;
+    const fit=(st,maxW,maxH,left,top)=>{ const bw=st.b[2]-st.b[0], bh=st.b[3]-st.b[1], k=Math.min(maxW/bw,maxH/bh); return {k,tx:left-st.b[0]*k,ty:top-st.b[1]*k,w:bw*k,h:bh*k}; };
+    const AK=STATES.find(x=>x.state==="Alaska"), HI=STATES.find(x=>x.state==="Hawaii");
+    const ak=fit(AK,sw,h*.42,sx0,y0+h*.2);
+    const hi=fit(HI,sw*.55,h*.2,sx0,y0+h*.2+ak.h+pad*1.2);
+    INSET={box:[x0,y0,w,h],Alaska:ak,Hawaii:hi};
+  }
+  applyInsets();
+}
+function applyInsets(){
+  const on=!!INSET; $("map").classList.toggle("westinsets",on);
+  $("westFrames").innerHTML="";
+  ["Alaska","Hawaii"].forEach(n=>{
+    const T=on?INSET[n]:null, tr=T?`translate(${T.tx} ${T.ty}) scale(${T.k})`:null;
+    [pathOf[n], document.querySelector('#borders [data-state="'+n+'"]')].forEach(el=>{ if(!el) return; tr?el.setAttribute("transform",tr):el.removeAttribute("transform"); });
+    if(T){ const r=document.createElementNS(SVGNS,"rect"); r.setAttribute("x",T.tx+STATES.find(x=>x.state===n).b[0]*T.k-6); r.setAttribute("y",T.ty+STATES.find(x=>x.state===n).b[1]*T.k-6);
+      r.setAttribute("width",T.w+12); r.setAttribute("height",T.h+12); r.setAttribute("rx",6); r.setAttribute("class","wframe"); $("westFrames").appendChild(r); }
+  });
+}
+/* where a state sits on screen, after any inset move */
+function placed(s){
+  const T=INSET&&INSET[s.state]; if(!T) return s;
+  const X=v=>v*T.k+T.tx, Y=v=>v*T.k+T.ty;
+  return {...s,cx:X(s.cx),cy:Y(s.cy),bx:X(s.bx),by:Y(s.by),size:s.size*T.k,b:[X(s.b[0]),Y(s.b[1]),X(s.b[2]),Y(s.b[3])]};
+}
+function insetOf(s){ return INSET&&INSET[s.state]; }
 function homeVB(){
+  computeInsets();
   if(settings.region==="All") return FULL;
-  // keep Alaska and Hawaii insets out of the West zoom so the mainland stays big
-  const list=regionStates().filter(s=>s.state!=="Alaska"&&s.state!=="Hawaii");
-  return boxFor(list,18);
+  if(INSET) return INSET.box;
+  return boxFor(regionStates(),18);
 }
 function scaleNow(){ return curVB[2]/975; }
 
@@ -528,8 +567,9 @@ function clearOverlay(){ $("overlay").innerHTML=""; }
 function clearMarks(){ STATES.forEach(s=>pathOf[s.state].classList.remove("target","settled","done","miss")); clearOverlay(); $("pins").innerHTML=""; }
 /* Leave a small star and a light label for a capital she got right, keeping the label inside the state when it fits */
 function addPin(s){
-  const k=homeVB()[2]/975, path=pathOf[s.state];
+  const T=insetOf(s), k=(homeVB()[2]/975)/(T?T.k:1), path=pathOf[s.state];
   const g=document.createElementNS(SVGNS,"g"); $("pins").appendChild(g);
+  if(T) g.setAttribute("transform",`translate(${T.tx} ${T.ty}) scale(${T.k})`);
   const st=document.createElementNS(SVGNS,"polygon");
   st.setAttribute("points",starPoints(5.5*k)); st.setAttribute("transform",`translate(${s.cx},${s.cy})`);
   st.setAttribute("class","pin-star"); g.appendChild(st);
@@ -560,30 +600,33 @@ function addPin(s){
 }
 function starPoints(r){ const pts=[]; for(let i=0;i<10;i++){const rr=i%2?r*.45:r, a=Math.PI/5*i-Math.PI/2; pts.push((Math.cos(a)*rr).toFixed(2)+","+(Math.sin(a)*rr).toFixed(2));} return pts.join(" "); }
 function drawRing(s,vb){
-  const k=vb[2]/975;
+  s=placed(s); const k=vb[2]/975;
   if(s.size/k>40) return;
   const c=document.createElementNS(SVGNS,"circle");
   c.setAttribute("cx",s.bx);c.setAttribute("cy",s.by);c.setAttribute("r",Math.max(s.size/2+8*k,24*k));
   c.setAttribute("class","ring");c.id="ring";$("overlay").appendChild(c);
 }
 function drawStar(s,vb){
-  const k=vb[2]/975;
-  const g=document.createElementNS(SVGNS,"g");
+  const T=insetOf(s), P=placed(s), k=(vb[2]/975)/(T?T.k:1);
+  const outer=document.createElementNS(SVGNS,"g");
+  if(T) outer.setAttribute("transform",`translate(${T.tx} ${T.ty}) scale(${T.k})`);
+  const g=document.createElementNS(SVGNS,"g"); outer.appendChild(g);
   g.setAttribute("transform",`translate(${s.cx},${s.cy})`);
   const st=document.createElementNS(SVGNS,"polygon");
   st.setAttribute("points",starPoints(11*k));st.setAttribute("class","star");
   g.appendChild(st);
   const t=document.createElementNS(SVGNS,"text");
-  const left=(s.cx-vb[0])/vb[2]>.72;
+  const left=(P.cx-vb[0])/vb[2]>.72;
   t.setAttribute("x",(left?-14:14)*k);t.setAttribute("y",6*k);
   t.setAttribute("text-anchor",left?"end":"start");
   t.setAttribute("class","cap-label");t.setAttribute("font-size",18*k);
   t.style.strokeWidth=(4*k)+"px";
   t.textContent=s.capital;
   g.appendChild(t);
-  $("overlay").appendChild(g);
+  $("overlay").appendChild(outer);
 }
 function viewForTarget(s){
+  s=placed(s);
   if(!zoomed){
     const h=homeVB();
     const inside=s.b[0]>=h[0]&&s.b[2]<=h[0]+h[2]&&s.b[1]>=h[1]&&s.b[3]<=h[1]+h[3];
@@ -597,7 +640,7 @@ function highlight(s){
   const p=pathOf[s.state]; p.classList.add("target");
   p.parentNode.appendChild(p); // bring to front so the outline shows
   const vb=viewForTarget(s); setVB(vb); drawRing(s,vb);
-  const small=s.size/(homeVB()[2]/975)<40;
+  const small=placed(s).size/(homeVB()[2]/975)<40;
   $("zoomBtn").classList.toggle("hidden",!small&&!zoomed);
   $("zoomBtn").innerHTML=zoomed?"&#127758; Whole Map":"&#128269; Zoom In";
 }
@@ -890,6 +933,9 @@ function confetti(){
   const ps=Array.from({length:160},()=>({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,r:5+Math.random()*6,vx:-2+Math.random()*4,vy:2+Math.random()*4,a:Math.random()*6,c:colors[Math.floor(Math.random()*5)]}));
   let t=0;(function step(){ctx.clearRect(0,0,cv.width,cv.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.a+=.1;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.fillStyle=p.c;ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*1.6);ctx.restore();});if(++t<200)requestAnimationFrame(step);else ctx.clearRect(0,0,cv.width,cv.height);})();
 }
+
+/* show the saved layer choices as soon as the page opens */
+applyLayers();
 </script>
 </body>
 </html>
