@@ -100,6 +100,7 @@
   .best{color:var(--muted);margin-top:4px}
   .keys{color:var(--muted);font-size:14px;text-align:center;margin-top:14px}
 
+  .ptoast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#fff;border:2px solid #1d3557;border-radius:12px;padding:6px 14px;font-weight:600;font-size:15px;color:#1d3557;z-index:80;box-shadow:0 3px 0 #1d3557}
   #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
   .bump{animation:bump .35s}
   @keyframes bump{50%{transform:scale(1.15)}}
@@ -287,7 +288,7 @@ function show(view){ ["setup","flipView","quizView","resultView"].forEach(v=>$(v
 function playerName(){ return ($("playerName").value||"").trim(); }
 
 function buildDeck(source){
-  let pool = source || STATES.filter(s=>settings.region==="All"||s.region===settings.region);
+  let pool = source || activeStates().filter(s=>settings.region==="All"||s.region===settings.region);
   pool = shuffle(pool);
   if(!source && settings.count!=="all") pool = pool.slice(0, Math.min(+settings.count, pool.length));
   return pool.map(s=>({...s, dir: settings.dir==="mix" ? (Math.random()<.5?"s2c":"c2s") : settings.dir}));
@@ -356,7 +357,10 @@ function renderQuiz(){
   const right = s2c ? c.capital : c.state;
   // distractors: prefer same region to make it a fair challenge
   const field = s2c ? "capital" : "state";
-  const nb = NEAR[c.state], nearStates = [...shuffle(nb.n), ...shuffle(nb.f)].slice(0,3);
+  const ok = x => !(NOMO && x==="Missouri"), nb = NEAR[c.state];
+  const nearStates = [...shuffle(nb.n.filter(ok)), ...shuffle(nb.f.filter(ok))];
+  shuffle(activeStates().map(x=>x.state)).forEach(x=>{ if(nearStates.length<3 && x!==c.state && !nearStates.includes(x)) nearStates.push(x); });
+  nearStates.length = 3;
   // capitals: two well-known cities from the same state plus a neighbor's capital; states: bordering states
   const wrong = s2c ? [...shuffle(CITIES[c.state]).slice(0,2), STATES.find(x=>x.state===nearStates[0]).capital] : nearStates;
   const opts = shuffle([right, ...wrong]);
@@ -460,6 +464,29 @@ function confetti(){
     if(++t<200) requestAnimationFrame(step); else ctx.clearRect(0,0,cv.width,cv.height);
   })();
 }
+
+/* ---------- personal setting: tap the page title five times quickly to switch it on or off ---------- */
+function nomoOn(){ try{ return localStorage.getItem("scm_nomo")==="1"; }catch(e){ return false; } }
+let NOMO=nomoOn();
+function activeStates(){ return NOMO ? STATES.filter(s=>s.state!=="Missouri") : STATES; }
+function refreshCounts(){
+  document.querySelectorAll('.chips[data-key="region"] .chip').forEach(c=>{
+    const v=c.dataset.val, n=v==="All"?activeStates().length:activeStates().filter(s=>s.region===v).length;
+    c.textContent = v==="All" ? `All ${n}` : `${v} (${n})`;
+  });
+}
+(function(){
+  const h=document.querySelector("h1"); let taps=[];
+  h.addEventListener("click",()=>{
+    const now=Date.now(); taps=taps.filter(t=>now-t<2500); taps.push(now);
+    if(taps.length>=5){ taps=[]; NOMO=!NOMO; try{ localStorage.setItem("scm_nomo",NOMO?"1":"0"); }catch(e){}
+      applyNomo();
+      const t=document.createElement("div"); t.className="ptoast"; t.textContent="Personal setting: "+(NOMO?"on":"off"); document.body.appendChild(t); setTimeout(()=>t.remove(),1800);
+    }
+  });
+})();
+function applyNomo(){ refreshCounts(); }
+applyNomo();
 </script>
 </body>
 </html>

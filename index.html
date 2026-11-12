@@ -173,6 +173,25 @@
   .motto .tr{font-style:normal;font-size:15px;color:var(--muted)}
   .trivia{margin:4px 0 0;padding-left:20px} .trivia li{margin-bottom:6px;line-height:1.35}
   #explore .answer-card{font-size:20px} #explore .answer-card b{font-size:26px}
+  .place-panel{display:flex;flex-direction:column}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow-y:auto;max-height:calc(100vh - 300px);min-height:160px;padding:4px 6px 6px 2px;align-content:start}
+  @media (max-width:899px){.tiles{max-height:300px}}
+  .tile{background:#fff;border:3px solid var(--navy);border-radius:12px;padding:9px 10px;font-weight:600;font-size:17px;text-align:center;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;box-shadow:0 3px 0 var(--navy);transition:transform .15s}
+  .tile:active{cursor:grabbing}
+  .tile.dragging{opacity:.35}
+  .tile.shake{animation:shake .4s}
+  @keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+  .ghost{position:fixed;z-index:60;pointer-events:none;background:var(--gold);border:3px solid var(--navy);border-radius:12px;padding:6px 12px;font-weight:700;font-size:17px;transform:translate(-50%,calc(-100% - 14px));white-space:nowrap}
+  .ghost::after{content:"";position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);border:8px solid transparent;border-top:10px solid var(--navy);border-bottom:0}
+  .dropdot{position:fixed;z-index:61;pointer-events:none;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--navy);border:2px solid #fff;box-shadow:0 0 0 2px var(--navy)}
+  body.is-dragging, body.is-dragging *{cursor:grabbing !important;user-select:none;-webkit-user-select:none}
+  #map.dragging *{pointer-events:none !important}
+  #map.dragging .st{pointer-events:auto !important}
+  .st.drop-hover{fill:#cfe0f2;stroke:#0b3d91;stroke-width:2.5}
+  .place-name{font-family:Fredoka,sans-serif;font-weight:500;fill:#0f1a2b;paint-order:stroke;stroke:rgba(255,255,255,.85);stroke-linejoin:round;pointer-events:none}
+  #placeFeedback{min-height:40px;font-size:18px;margin:10px 0 0}
+  .ptoast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#fff;border:2px solid #1d3557;border-radius:12px;padding:6px 14px;font-weight:600;font-size:15px;color:#1d3557;z-index:80;box-shadow:0 3px 0 #1d3557}
+  #map.nomo [data-state="Missouri"],#map.nomo [data-lake$="|Missouri"]{display:none}
   #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
   .speak{background:transparent;border:none;font-size:24px;cursor:pointer;vertical-align:middle}
 </style>
@@ -258,6 +277,7 @@
         <button class="chip" data-val="capital" aria-pressed="true">&#11088; Find the Capital<small>See the state, pick its capital</small></button>
         <button class="chip" data-val="state" aria-pressed="false">&#128506; Name the State<small>Which state is flashing?</small></button>
         <button class="chip" data-val="flip" aria-pressed="false">&#127183; Flip Cards<small>Guess, then reveal</small></button>
+        <button class="chip" data-val="place" aria-pressed="false">&#129513; Place the States<small>Drag names onto the map</small></button>
         <button class="chip" data-val="explore" aria-pressed="false">&#128269; Explore<small>Tap any state</small></button>
       </div>
     </div>
@@ -310,6 +330,21 @@
       <div class="center"><button class="btn hidden" id="nextBtn">Next &#9654;</button></div>
     </div>
 
+  </section>
+
+  <!-- PLACE THE STATES -->
+  <section id="placeView" class="hidden">
+    <div class="topbar">
+      <button class="btn secondary small" data-home>&#8962; Menu</button>
+      <span class="pill" id="placeCounter">Placed 0 of 10</span>
+      <span class="pill" id="placeTries">Tries: 0</span>
+    </div>
+    <div class="progress"><div id="placeBar"></div></div>
+    <div class="panel place-panel">
+      <div class="question" style="margin-bottom:8px">Drag each name onto its state on the map.</div>
+      <div class="tiles" id="tiles"></div>
+      <div class="feedback" id="placeFeedback" aria-live="polite"></div>
+    </div>
   </section>
 
   <!-- EXPLORE -->
@@ -399,7 +434,7 @@ STATES.forEach(s=>{
   const mk=(tag,attrs,parent)=>{const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);parent.appendChild(e);return e;};
   // clip: US states plus Canada and Mexico, so lines stop at the coast
   const clip=$("landClip");
-  STATES.forEach(s=>mk("path",{d:s.d},clip));
+  STATES.forEach(s=>mk("path",{d:s.d,"data-state":s.state},clip));
   LAYERS.neighbors.forEach(n=>{ mk("path",{d:n.d},clip); mk("path",{d:n.d,class:"neighbor"},$("lyrNeighbors")); });
   LAYERS.insets.forEach((b,i)=>{ const x=Math.max(0,b[0]); mk("rect",{x,y:b[1],width:b[2]-(x-b[0]),height:b[3],rx:6,class:"inset akhi"},$("lyrInsets")); });
   LAYERS.ranges.forEach(r=>{ const c=r.ak?" akhi":""; mk("path",{d:r.d,class:"range-tint"+c},$("lyrRanges")); mk("path",{d:r.d,class:"range"+c},$("lyrRanges")); });
@@ -517,7 +552,7 @@ function boxFor(list,pad){
   if(w/h<ar){const nw=h*ar;x0-=(nw-w)/2;w=nw;} else {const nh=w/ar;y0-=(nh-h)/2;h=nh;}
   return [x0,y0,w,h];
 }
-function regionStates(){ return STATES.filter(s=>settings.region==="All"||s.region===settings.region); }
+function regionStates(){ return activeStates().filter(s=>settings.region==="All"||s.region===settings.region); }
 /* West region: Alaska and Hawaii are moved into boxes over the Pacific, left of the mainland */
 let INSET=null, insetKey=null;
 function computeInsets(){
@@ -566,20 +601,22 @@ function scaleNow(){ return curVB[2]/975; }
 function clearOverlay(){ $("overlay").innerHTML=""; }
 function clearMarks(){ STATES.forEach(s=>pathOf[s.state].classList.remove("target","settled","done","miss")); clearOverlay(); $("pins").innerHTML=""; }
 /* Leave a small star and a light label for a capital she got right, keeping the label inside the state when it fits */
-function addPin(s){
+function addPin(s,opt){
+  opt=opt||{};
   const T=insetOf(s), k=(homeVB()[2]/975)/(T?T.k:1), path=pathOf[s.state];
   const g=document.createElementNS(SVGNS,"g"); $("pins").appendChild(g);
   if(T) g.setAttribute("transform",`translate(${T.tx} ${T.ty}) scale(${T.k})`);
   const st=document.createElementNS(SVGNS,"polygon");
   st.setAttribute("points",starPoints(5.5*k)); st.setAttribute("transform",`translate(${s.cx},${s.cy})`);
-  st.setAttribute("class","pin-star"); g.appendChild(st);
-  const t=document.createElementNS(SVGNS,"text"); t.setAttribute("class","pin-label"); t.textContent=s.capital; g.appendChild(t);
+  st.setAttribute("class","pin-star"); if(opt.star!==false) g.appendChild(st);
+  const t=document.createElementNS(SVGNS,"text"); t.setAttribute("class",opt.label?"place-name":"pin-label"); t.textContent=opt.label||s.capital; g.appendChild(t);
   const inside=(x,y)=>{ try{ const pt=$("map").createSVGPoint(); pt.x=x; pt.y=y; return path.isPointInFill(pt);}catch(e){ return false; } };
   let best=null;
   for(const fs of [12.5,11,9.5,8]){
     const f=fs*k; t.setAttribute("font-size",f); t.style.strokeWidth=(2.6*k)+"px";
     const w=t.getComputedTextLength(), h=f*.8, gap=7*k;
     const cands=[
+      ...(opt.label?[[s.bx, s.by+h/3, "middle"],[s.cx, s.cy+h/3, "middle"]]:[]),
       [s.cx+gap, s.cy+h/2, "start"], [s.cx-gap, s.cy+h/2, "end"],
       [s.cx, s.cy+gap+h, "middle"], [s.cx, s.cy-gap, "middle"],
       [s.cx+gap*.7, s.cy+gap+h, "start"], [s.cx-gap*.7, s.cy+gap+h, "end"],
@@ -662,7 +699,7 @@ document.querySelectorAll(".chips").forEach(g=>g.addEventListener("click",e=>{
 try{ $("playerName").value=localStorage.getItem("scm_name")||""; }catch(e){}
 function playerName(){ return ($("playerName").value||"").trim(); }
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function show(v){ ["setup","play","explore","results"].forEach(x=>$(x).classList.toggle("hidden",x!==v)); applyLayers(); }
+function show(v){ ["setup","play","placeView","explore","results"].forEach(x=>$(x).classList.toggle("hidden",x!==v)); applyLayers(); }
 
 function goHome(){
   clearMarks(); zoomed=false; $("zoomBtn").classList.add("hidden"); $("maptag").classList.add("hidden");
@@ -678,10 +715,11 @@ function start(source){
   let pool=shuffle(source||regionStates());
   if(!source&&settings.count!=="all") pool=pool.slice(0,Math.min(+settings.count,pool.length));
   deck=pool; idx=0; score=0; streak=0; bestStreak=0; missed=[]; total=deck.length;
+  if(settings.mode==="place") return startPlace();
   setVB(homeVB()); show("play");
   $("scorePill").classList.toggle("hidden",settings.mode==="flip");
   $("streakPill").classList.toggle("hidden",settings.mode==="flip");
-  $("maptag").textContent = settings.region==="All" ? "All 50 States" : settings.region;
+  $("maptag").textContent = settings.region==="All" ? `All ${activeStates().length} States` : settings.region;
   $("maptag").classList.remove("hidden");
   render();
 }
@@ -733,7 +771,13 @@ function render(){
   });
 }
 /* Name the State: only bordering states (or the nearest ones when a state has few neighbors) */
-function stateChoices(s){ const nb=NEAR[s.state]; return [...shuffle(nb.n),...shuffle(nb.f)].slice(0,3); }
+function stateChoices(s){
+  const ok=x=>!(NOMO&&x==="Missouri"), nb=NEAR[s.state];
+  const list=[...shuffle(nb.n.filter(ok)),...shuffle(nb.f.filter(ok))];
+  // fill up from other states if a neighbor was left out
+  shuffle(activeStates().map(x=>x.state)).forEach(x=>{ if(list.length<3&&x!==s.state&&!list.includes(x)) list.push(x); });
+  return list.slice(0,3);
+}
 /* Find the Capital: two well-known cities from the same state plus a neighboring state's capital */
 function capitalChoices(s){
   const near=stateChoices(s)[0];
@@ -790,6 +834,7 @@ function startExplore(){
   $("exploreInfo").innerHTML="Tap any state on the map to see its name and capital.";
 }
 function exploreClick(s){
+  if(NOMO&&s.state==="Missouri") return;
   if($("explore").classList.contains("hidden")) return;
   clearOverlay(); STATES.forEach(x=>pathOf[x.state].classList.remove("target","settled"));
   const p=pathOf[s.state]; p.classList.add("target","settled"); p.parentNode.appendChild(p);
@@ -808,12 +853,117 @@ function exploreClick(s){
 }
 
 /* ---------- results ---------- */
+/* ---------- Place the States (drag and drop) ---------- */
+let placeTries=0, placedCount=0, triesBy={};
+function startPlace(){
+  placeTries=0; placedCount=0; triesBy={};
+  setVB(homeVB()); show("placeView");
+  $("maptag").textContent = settings.region==="All" ? `All ${activeStates().length} States` : settings.region; $("maptag").classList.remove("hidden");
+  const box=$("tiles"); box.innerHTML=""; $("placeFeedback").innerHTML="";
+  shuffle(deck).forEach(s=>{ const t=document.createElement("div"); t.className="tile"; t.textContent=s.state; t.dataset.state=s.state; box.appendChild(t); makeDraggable(t); });
+  box.scrollTop=0; updatePlaceStatus();
+}
+function updatePlaceStatus(){
+  $("placeCounter").textContent=`Placed ${placedCount} of ${total}`;
+  $("placeTries").textContent=`Tries: ${placeTries}`;
+  $("placeBar").style.width=`${placedCount/total*100}%`;
+}
+function stateAt(x,y){
+  const el=document.elementsFromPoint(x,y).find(e=>e.classList&&e.classList.contains("st"));
+  return el&&getComputedStyle(el).display!=="none"?el.dataset.state:null;
+}
+// counts as a hit if the drop is on the state, or within a fingertip of a small state's edge
+function hitsState(x,y,name){
+  if(stateAt(x,y)===name) return true;
+  // near a border, a drop within a few pixels of the right state still counts; small states get more room
+  const s=STATES.find(v=>v.state===name), small=placed(s).size/(curVB[2]/975)<45;
+  const radii=small?[6,11,16]:[5,9];
+  for(const r of radii) for(let a=0;a<12;a++){ const X=x+r*Math.cos(a*Math.PI/6), Y=y+r*Math.sin(a*Math.PI/6); if(stateAt(X,Y)===name) return true; }
+  return false;
+}
+let hoverEl=null;
+function setDropHover(name){
+  if(hoverEl) hoverEl.classList.remove("drop-hover");
+  hoverEl=name?pathOf[name]:null;
+  if(hoverEl&&!hoverEl.classList.contains("done")) hoverEl.classList.add("drop-hover"); else hoverEl=null;
+}
+let drag=null;
+function makeDraggable(tile){
+  tile.addEventListener("pointerdown",e=>{
+    if(e.button>0) return; e.preventDefault();
+    if(drag) endDrag(null);                      // never leave an old drag hanging
+    const ghost=document.createElement("div"); ghost.className="ghost"; ghost.textContent=tile.dataset.state;
+    const dot=document.createElement("div"); dot.className="dropdot";
+    document.body.append(ghost,dot);
+    drag={tile,name:tile.dataset.state,ghost,dot,x:e.clientX,y:e.clientY,raf:0,id:e.pointerId};
+    tile.classList.add("dragging"); document.body.classList.add("is-dragging"); $("map").classList.add("dragging");
+    try{ tile.setPointerCapture(e.pointerId); }catch(_){}
+    positionDrag();
+  });
+}
+function positionDrag(){
+  if(!drag) return;
+  drag.ghost.style.left=drag.dot.style.left=drag.x+"px";
+  drag.ghost.style.top=drag.dot.style.top=drag.y+"px";
+  setDropHover(stateAt(drag.x,drag.y));
+}
+window.addEventListener("pointermove",e=>{
+  if(!drag||e.pointerId!==drag.id) return;
+  // mouse button already released somewhere we could not hear: stop cleanly
+  if(e.pointerType==="mouse"&&e.buttons===0){ endDrag(null); return; }
+  drag.x=e.clientX; drag.y=e.clientY;
+  if(!drag.raf) drag.raf=requestAnimationFrame(()=>{ if(drag){ drag.raf=0; positionDrag(); } });
+});
+window.addEventListener("pointerup",e=>{ if(drag&&e.pointerId===drag.id) endDrag({x:e.clientX,y:e.clientY}); });
+window.addEventListener("pointercancel",e=>{ if(drag&&e.pointerId===drag.id) endDrag(null); });
+window.addEventListener("blur",()=>{ if(drag) endDrag(null); });
+document.addEventListener("lostpointercapture",e=>{ if(drag&&e.pointerId===drag.id) setTimeout(()=>{ if(drag&&drag.id===e.pointerId) endDrag(null); },0); });
+function endDrag(at){
+  const d=drag; drag=null; if(!d) return;
+  if(d.raf) cancelAnimationFrame(d.raf);
+  d.ghost.remove(); d.dot.remove(); setDropHover(null);
+  d.tile.classList.remove("dragging"); document.body.classList.remove("is-dragging");
+  try{ d.tile.releasePointerCapture(d.id); }catch(_){}
+  if(at){
+    const name=stateAt(at.x,at.y);
+    const overMap=!!document.elementsFromPoint(at.x,at.y).find(el=>el.id==="map");
+    $("map").classList.remove("dragging");
+    if(overMap&&d.tile.isConnected) dropTile(d.tile,d.name,at.x,at.y);
+  } else $("map").classList.remove("dragging");
+}
+function dropTile(tile,name,x,y){
+  placeTries++; triesBy[name]=(triesBy[name]||0)+1;
+  const s=STATES.find(v=>v.state===name);
+  if(hitsState(x,y,name)){
+    // solid blue on the first try, red stripes if it took more than one
+    pathOf[name].classList.add(missed.includes(s)?"miss":"done");
+    addPin(s,{label:name,star:false});
+    tile.remove(); placedCount++;
+    $("placeFeedback").innerHTML=`<span class="ok">\u2714 ${cheers[Math.floor(Math.random()*cheers.length)]}</span> That is ${name}.`;
+    updatePlaceStatus();
+    if(placedCount>=total) setTimeout(finishPlace,600);
+  } else {
+    const on=stateAt(x,y);
+    if(!missed.includes(s)) missed.push(s);
+    tile.classList.remove("shake"); void tile.offsetWidth; tile.classList.add("shake");
+    $("placeFeedback").innerHTML = on ? `<span class="no">\u2716 Not quite.</span> That is ${on}. Try again!` : `<span class="no">\u2716 That is not a state.</span> Try again!`;
+    if(on){ const P=placed(STATES.find(v=>v.state===on)); const box=$("mapbox").getBoundingClientRect(); placeTip(`That is ${on}`,{clientX:x,clientY:y}); clearTimeout(tipTimer); tipTimer=setTimeout(hideRiverTip,1800); }
+    updatePlaceStatus();
+  }
+}
+function finishPlace(){
+  score=total-missed.length;
+  finish();
+}
 function finish(){
   $("bar").style.width="100%";
   const name=playerName(); let pct,line;
   if(settings.mode==="flip"){
     const first=total-missed.length; pct=first/total;
     $("resultScore").textContent=`${first} / ${total}`; line=`knew on the first try. You learned all ${total}!`;
+  } else if(settings.mode==="place"){
+    pct=score/total; $("resultScore").textContent=`${score} / ${total}`;
+    line=`placed on the first try, with ${placeTries} tries in all.`;
   } else {
     pct=score/total; $("resultScore").textContent=`${score} / ${total}`;
     line=`correct. Best streak: ${bestStreak} in a row.`;
@@ -827,14 +977,14 @@ function finish(){
   $("practiceMissedBtn").classList.toggle("hidden",!missed.length);
   $("missedList").innerHTML=missed.map(m=>`<span>${m.state}: <b>${m.capital}</b></span>`).join("");
   clearOverlay(); STATES.forEach(x=>pathOf[x.state].classList.remove("target","settled"));
-  missed.forEach(m=>drawStar(m,homeVB()));
+  if(settings.mode!=="place") missed.forEach(m=>drawStar(m,homeVB()));
   zoomed=false; setVB(homeVB()); $("zoomBtn").classList.add("hidden");
   show("results"); if(pct>=.7) confetti();
   saveGame({player:(players().find(n=>n.toLowerCase()===name.toLowerCase()))||name||"Guest",mode:settings.mode,region:settings.region,score:settings.mode==="flip"?total-missed.length:score,
-    total,bestStreak:settings.mode==="flip"?null:bestStreak,missed:missed.map(m=>m.state),practice:!!lastSource});
+    total,bestStreak:(settings.mode==="flip"||settings.mode==="place")?null:bestStreak,tries:settings.mode==="place"?placeTries:undefined,missed:missed.map(m=>m.state),practice:!!lastSource});
 }
 /* ---------- scoreboard storage ---------- */
-const MODE_NAMES={capital:"Find the Capital",state:"Name the State",flip:"Flip Cards"};
+const MODE_NAMES={capital:"Find the Capital",state:"Name the State",flip:"Flip Cards",place:"Place the States"};
 let dbRef=null, games=[], boardUnsub=null;
 const STANDALONE=true;
 const dbReady=STANDALONE?Promise.resolve(null):new Promise(res=>{
@@ -934,6 +1084,29 @@ function confetti(){
   let t=0;(function step(){ctx.clearRect(0,0,cv.width,cv.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.a+=.1;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.fillStyle=p.c;ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*1.6);ctx.restore();});if(++t<200)requestAnimationFrame(step);else ctx.clearRect(0,0,cv.width,cv.height);})();
 }
 
+
+/* ---------- personal setting: tap the page title five times quickly to switch it on or off ---------- */
+function nomoOn(){ try{ return localStorage.getItem("scm_nomo")==="1"; }catch(e){ return false; } }
+let NOMO=nomoOn();
+function activeStates(){ return NOMO ? STATES.filter(s=>s.state!=="Missouri") : STATES; }
+function refreshCounts(){
+  document.querySelectorAll('.chips[data-key="region"] .chip').forEach(c=>{
+    const v=c.dataset.val, n=v==="All"?activeStates().length:activeStates().filter(s=>s.region===v).length;
+    c.textContent = v==="All" ? `All ${n}` : `${v} (${n})`;
+  });
+}
+(function(){
+  const h=document.querySelector("h1"); let taps=[];
+  h.addEventListener("click",()=>{
+    const now=Date.now(); taps=taps.filter(t=>now-t<2500); taps.push(now);
+    if(taps.length>=5){ taps=[]; NOMO=!NOMO; try{ localStorage.setItem("scm_nomo",NOMO?"1":"0"); }catch(e){}
+      applyNomo();
+      const t=document.createElement("div"); t.className="ptoast"; t.textContent="Personal setting: "+(NOMO?"on":"off"); document.body.appendChild(t); setTimeout(()=>t.remove(),1800);
+    }
+  });
+})();
+function applyNomo(){ $("map").classList.toggle("nomo",NOMO); refreshCounts(); }
+applyNomo();
 /* show the saved layer choices as soon as the page opens */
 applyLayers();
 </script>
